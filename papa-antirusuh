@@ -5,7 +5,7 @@
 # All-in-One Protection: Anti Delete, Anti Access, Anti Modify
 # =============================================================================
 
-PROTECT_NAME="ARR Official"
+PROTECT_NAME="Papa Queen"
 TIMESTAMP=$(date -u +"%Y-%m-%d-%H-%M-%S")
 
 echo "========================================"
