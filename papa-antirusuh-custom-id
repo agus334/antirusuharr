@@ -3,8 +3,8 @@
 # =============================================================================
 # KONFIGURASI ID YANG DIIZINKAN - ISI SESUAI KEBUTUHAN
 # =============================================================================
-ALLOWED_ID_1="x"      # Isi ID pertama di sini (contoh: 1)
-ALLOWED_ID_2="x"      # Isi ID kedua di sini  (contoh: 5)
+ALLOWED_ID_1="1"      # Isi ID pertama di sini (contoh: 1)
+ALLOWED_ID_2="4"      # Isi ID kedua di sini  (contoh: 5)
 # =============================================================================
 
 # =============================================================================
