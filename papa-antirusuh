@@ -1,6 +1,13 @@
 #!/bin/bash
 
 # =============================================================================
+# KONFIGURASI ID YANG DIIZINKAN - ISI SESUAI KEBUTUHAN
+# =============================================================================
+ALLOWED_ID_1=         # Isi ID pertama di sini (contoh: 1)
+ALLOWED_ID_2=         # Isi ID kedua di sini  (contoh: 5)
+# =============================================================================
+
+# =============================================================================
 # PTERODACTYL PANEL COMPLETE PROTECTION SCRIPT
 # All-in-One Protection: Anti Delete, Anti Access, Anti Modify
 # =============================================================================
@@ -29,7 +36,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP1'
+cat > "$REMOTE_PATH" << EOFPHP1
 <?php
 
 namespace Pterodactyl\Services\Servers;
@@ -46,70 +53,70 @@ use Pterodactyl\Exceptions\Http\Connection\DaemonConnectionException;
 
 class ServerDeletionService
 {
-    protected bool $force = false;
+    protected bool \$force = false;
 
     public function __construct(
-        private ConnectionInterface $connection,
-        private DaemonServerRepository $daemonServerRepository,
-        private DatabaseManagementService $databaseManagementService
+        private ConnectionInterface \$connection,
+        private DaemonServerRepository \$daemonServerRepository,
+        private DatabaseManagementService \$databaseManagementService
     ) {
     }
 
-    public function withForce(bool $bool = true): self
+    public function withForce(bool \$bool = true): self
     {
-        $this->force = $bool;
-        return $this;
+        \$this->force = \$bool;
+        return \$this;
     }
 
-    public function handle(Server $server): void
+    public function handle(Server \$server): void
     {
-        $user = Auth::user();
+        \$user = Auth::user();
+        \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
 
-        if ($user) {
-            if ($user->id !== 1) {
-                $ownerId = $server->owner_id
-                    ?? $server->user_id
-                    ?? ($server->owner?->id ?? null)
-                    ?? ($server->user?->id ?? null);
+        if (\$user) {
+            if (!in_array(\$user->id, \$allowedIds)) {
+                \$ownerId = \$server->owner_id
+                    ?? \$server->user_id
+                    ?? (\$server->owner?->id ?? null)
+                    ?? (\$server->user?->id ?? null);
 
-                if ($ownerId === null) {
+                if (\$ownerId === null) {
                     throw new DisplayException('Akses ditolak: informasi pemilik server tidak tersedia.');
                 }
 
-                if ($ownerId !== $user->id) {
-                    throw new DisplayException('❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+                if (\$ownerId !== \$user->id) {
+                    throw new DisplayException('❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
                 }
             }
         }
 
         try {
-            $this->daemonServerRepository->setServer($server)->delete();
-        } catch (DaemonConnectionException $exception) {
-            if (!$this->force && $exception->getStatusCode() !== Response::HTTP_NOT_FOUND) {
-                throw $exception;
+            \$this->daemonServerRepository->setServer(\$server)->delete();
+        } catch (DaemonConnectionException \$exception) {
+            if (!\$this->force && \$exception->getStatusCode() !== Response::HTTP_NOT_FOUND) {
+                throw \$exception;
             }
-            Log::warning($exception);
+            Log::warning(\$exception);
         }
 
-        $this->connection->transaction(function () use ($server) {
-            foreach ($server->databases as $database) {
+        \$this->connection->transaction(function () use (\$server) {
+            foreach (\$server->databases as \$database) {
                 try {
-                    $this->databaseManagementService->delete($database);
-                } catch (\Exception $exception) {
-                    if (!$this->force) {
-                        throw $exception;
+                    \$this->databaseManagementService->delete(\$database);
+                } catch (\Exception \$exception) {
+                    if (!\$this->force) {
+                        throw \$exception;
                     }
-                    $database->delete();
-                    Log::warning($exception);
+                    \$database->delete();
+                    Log::warning(\$exception);
                 }
             }
-            $server->delete();
+            \$server->delete();
         });
     }
 }
 EOFPHP1
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -128,7 +135,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP2'
+cat > "$REMOTE_PATH" << EOFPHP2
 <?php
 
 namespace Pterodactyl\Http\Controllers\Admin;
@@ -157,20 +164,22 @@ class UserController extends Controller
 {
     use AvailableLanguages;
 
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
     public function __construct(
-        protected AlertsMessageBag $alert,
-        protected UserCreationService $creationService,
-        protected UserDeletionService $deletionService,
-        protected Translator $translator,
-        protected UserUpdateService $updateService,
-        protected UserRepositoryInterface $repository,
-        protected ViewFactory $view
+        protected AlertsMessageBag \$alert,
+        protected UserCreationService \$creationService,
+        protected UserDeletionService \$deletionService,
+        protected Translator \$translator,
+        protected UserUpdateService \$updateService,
+        protected UserRepositoryInterface \$repository,
+        protected ViewFactory \$view
     ) {
     }
 
-    public function index(Request $request): View
+    public function index(Request \$request): View
     {
-        $users = QueryBuilder::for(
+        \$users = QueryBuilder::for(
             User::query()->select('users.*')
                 ->selectRaw('COUNT(DISTINCT(subusers.id)) as subuser_of_count')
                 ->selectRaw('COUNT(DISTINCT(servers.id)) as servers_count')
@@ -182,91 +191,90 @@ class UserController extends Controller
             ->allowedSorts(['id', 'uuid'])
             ->paginate(50);
 
-        return $this->view->make('admin.users.index', ['users' => $users]);
+        return \$this->view->make('admin.users.index', ['users' => \$users]);
     }
 
     public function create(): View
     {
-        return $this->view->make('admin.users.new', [
-            'languages' => $this->getAvailableLanguages(true),
+        return \$this->view->make('admin.users.new', [
+            'languages' => \$this->getAvailableLanguages(true),
         ]);
     }
 
-    public function view(User $user): View
+    public function view(User \$user): View
     {
-        return $this->view->make('admin.users.view', [
-            'user' => $user,
-            'languages' => $this->getAvailableLanguages(true),
+        return \$this->view->make('admin.users.view', [
+            'user' => \$user,
+            'languages' => \$this->getAvailableLanguages(true),
         ]);
     }
 
-    public function delete(Request $request, User $user): RedirectResponse
+    public function delete(Request \$request, User \$user): RedirectResponse
     {
-        if ($request->user()->id !== 1) {
-            throw new DisplayException("❌ Jangan rusuh bang! Protected by ©PROTECT_NAME_PLACEHOLDER");
+        if (!in_array(\$request->user()->id, \$this->allowedIds)) {
+            throw new DisplayException("❌ Jangan rusuh bang! Protected by ©${PROTECT_NAME}");
         }
 
-        if ($request->user()->id === $user->id) {
-            throw new DisplayException($this->translator->get('admin/user.exceptions.user_has_servers'));
+        if (\$request->user()->id === \$user->id) {
+            throw new DisplayException(\$this->translator->get('admin/user.exceptions.user_has_servers'));
         }
 
-        $this->deletionService->handle($user);
+        \$this->deletionService->handle(\$user);
 
         return redirect()->route('admin.users');
     }
 
-    public function store(NewUserFormRequest $request): RedirectResponse
+    public function store(NewUserFormRequest \$request): RedirectResponse
     {
-        $user = $this->creationService->handle($request->normalize());
-        $this->alert->success($this->translator->get('admin/user.notices.account_created'))->flash();
+        \$user = \$this->creationService->handle(\$request->normalize());
+        \$this->alert->success(\$this->translator->get('admin/user.notices.account_created'))->flash();
 
-        return redirect()->route('admin.users.view', $user->id);
+        return redirect()->route('admin.users.view', \$user->id);
     }
 
-    public function update(UserFormRequest $request, User $user): RedirectResponse
+    public function update(UserFormRequest \$request, User \$user): RedirectResponse
     {
-        $restrictedFields = ['email', 'first_name', 'last_name', 'password'];
+        \$restrictedFields = ['email', 'first_name', 'last_name', 'password'];
 
-        foreach ($restrictedFields as $field) {
-            if ($request->filled($field) && $request->user()->id !== 1) {
-                throw new DisplayException("⚠️ Data hanya bisa diubah oleh admin ID 1.");
+        foreach (\$restrictedFields as \$field) {
+            if (\$request->filled(\$field) && !in_array(\$request->user()->id, \$this->allowedIds)) {
+                throw new DisplayException("⚠️ Data hanya bisa diubah oleh admin yang diizinkan.");
             }
         }
 
-        if ($user->root_admin && $request->user()->id !== 1) {
-            throw new DisplayException("🚫 Tidak dapat menurunkan hak admin pengguna ini. Hanya ID 1 yang memiliki izin.");
+        if (\$user->root_admin && !in_array(\$request->user()->id, \$this->allowedIds)) {
+            throw new DisplayException("🚫 Tidak dapat menurunkan hak admin pengguna ini. Hanya ID yang diizinkan yang memiliki akses.");
         }
 
-        $this->updateService
+        \$this->updateService
             ->setUserLevel(User::USER_LEVEL_ADMIN)
-            ->handle($user, $request->normalize());
+            ->handle(\$user, \$request->normalize());
 
-        $this->alert->success(trans('admin/user.notices.account_updated'))->flash();
+        \$this->alert->success(trans('admin/user.notices.account_updated'))->flash();
 
-        return redirect()->route('admin.users.view', $user->id);
+        return redirect()->route('admin.users.view', \$user->id);
     }
 
-    public function json(Request $request): Model|Collection
+    public function json(Request \$request): Model|Collection
     {
-        $users = QueryBuilder::for(User::query())->allowedFilters(['email'])->paginate(25);
+        \$users = QueryBuilder::for(User::query())->allowedFilters(['email'])->paginate(25);
 
-        if ($request->query('user_id')) {
-            $user = User::query()->findOrFail($request->input('user_id'));
-            $user->md5 = md5(strtolower($user->email));
+        if (\$request->query('user_id')) {
+            \$user = User::query()->findOrFail(\$request->input('user_id'));
+            \$user->md5 = md5(strtolower(\$user->email));
 
-            return $user;
+            return \$user;
         }
 
-        return $users->map(function ($item) {
-            $item->md5 = md5(strtolower($item->email));
+        return \$users->map(function (\$item) {
+            \$item->md5 = md5(strtolower(\$item->email));
 
-            return $item;
+            return \$item;
         });
     }
 }
 EOFPHP2
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -285,7 +293,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP3'
+cat > "$REMOTE_PATH" << EOFPHP3
 <?php
 
 namespace Pterodactyl\Http\Controllers\Admin;
@@ -306,90 +314,91 @@ use Pterodactyl\Contracts\Repository\LocationRepositoryInterface;
 
 class LocationController extends Controller
 {
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
     public function __construct(
-        protected AlertsMessageBag $alert,
-        protected LocationCreationService $creationService,
-        protected LocationDeletionService $deletionService,
-        protected LocationRepositoryInterface $repository,
-        protected LocationUpdateService $updateService,
-        protected ViewFactory $view
+        protected AlertsMessageBag \$alert,
+        protected LocationCreationService \$creationService,
+        protected LocationDeletionService \$deletionService,
+        protected LocationRepositoryInterface \$repository,
+        protected LocationUpdateService \$updateService,
+        protected ViewFactory \$view
     ) {
     }
 
     public function index(): View
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, 'Akses ditolak! Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, 'Akses ditolak! Protected by ©${PROTECT_NAME}');
         }
 
-        return $this->view->make('admin.locations.index', [
-            'locations' => $this->repository->getAllWithDetails(),
+        return \$this->view->make('admin.locations.index', [
+            'locations' => \$this->repository->getAllWithDetails(),
         ]);
     }
 
-    public function view(int $id): View
+    public function view(int \$id): View
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
         }
 
-        return $this->view->make('admin.locations.view', [
-            'location' => $this->repository->getWithNodes($id),
+        return \$this->view->make('admin.locations.view', [
+            'location' => \$this->repository->getWithNodes(\$id),
         ]);
     }
 
-    public function create(LocationFormRequest $request): RedirectResponse
+    public function create(LocationFormRequest \$request): RedirectResponse
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
         }
 
-        $location = $this->creationService->handle($request->normalize());
-        $this->alert->success('Location was created successfully.')->flash();
+        \$location = \$this->creationService->handle(\$request->normalize());
+        \$this->alert->success('Location was created successfully.')->flash();
 
-        return redirect()->route('admin.locations.view', $location->id);
+        return redirect()->route('admin.locations.view', \$location->id);
     }
 
-    public function update(LocationFormRequest $request, Location $location): RedirectResponse
+    public function update(LocationFormRequest \$request, Location \$location): RedirectResponse
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
         }
 
-        if ($request->input('action') === 'delete') {
-            return $this->delete($location);
+        if (\$request->input('action') === 'delete') {
+            return \$this->delete(\$location);
         }
 
-        $this->updateService->handle($location->id, $request->normalize());
-        $this->alert->success('Location was updated successfully.')->flash();
+        \$this->updateService->handle(\$location->id, \$request->normalize());
+        \$this->alert->success('Location was updated successfully.')->flash();
 
-        return redirect()->route('admin.locations.view', $location->id);
+        return redirect()->route('admin.locations.view', \$location->id);
     }
 
-    public function delete(Location $location): RedirectResponse
+    public function delete(Location \$location): RedirectResponse
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
         }
 
         try {
-            $this->deletionService->handle($location->id);
+            \$this->deletionService->handle(\$location->id);
             return redirect()->route('admin.locations');
-        } catch (DisplayException $ex) {
-            $this->alert->danger($ex->getMessage())->flash();
+        } catch (DisplayException \$ex) {
+            \$this->alert->danger(\$ex->getMessage())->flash();
         }
 
-        return redirect()->route('admin.locations.view', $location->id);
+        return redirect()->route('admin.locations.view', \$location->id);
     }
 }
 EOFPHP3
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -408,7 +417,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP4'
+cat > "$REMOTE_PATH" << EOFPHP4
 <?php
 
 namespace Pterodactyl\Http\Controllers\Admin\Nests;
@@ -427,67 +436,68 @@ use Illuminate\Support\Facades\Auth;
 
 class NestController extends Controller
 {
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
     public function __construct(
-        protected AlertsMessageBag $alert,
-        protected NestCreationService $nestCreationService,
-        protected NestDeletionService $nestDeletionService,
-        protected NestRepositoryInterface $repository,
-        protected NestUpdateService $nestUpdateService,
-        protected ViewFactory $view
+        protected AlertsMessageBag \$alert,
+        protected NestCreationService \$nestCreationService,
+        protected NestDeletionService \$nestDeletionService,
+        protected NestRepositoryInterface \$repository,
+        protected NestUpdateService \$nestUpdateService,
+        protected ViewFactory \$view
     ) {
     }
 
     public function index(): View
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '🚫 Akses ditolak! Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '🚫 Akses ditolak! Protected by ©${PROTECT_NAME}');
         }
 
-        return $this->view->make('admin.nests.index', [
-            'nests' => $this->repository->getWithCounts(),
+        return \$this->view->make('admin.nests.index', [
+            'nests' => \$this->repository->getWithCounts(),
         ]);
     }
 
     public function create(): View
     {
-        return $this->view->make('admin.nests.new');
+        return \$this->view->make('admin.nests.new');
     }
 
-    public function store(StoreNestFormRequest $request): RedirectResponse
+    public function store(StoreNestFormRequest \$request): RedirectResponse
     {
-        $nest = $this->nestCreationService->handle($request->normalize());
-        $this->alert->success(trans('admin/nests.notices.created', ['name' => htmlspecialchars($nest->name)]))->flash();
+        \$nest = \$this->nestCreationService->handle(\$request->normalize());
+        \$this->alert->success(trans('admin/nests.notices.created', ['name' => htmlspecialchars(\$nest->name)]))->flash();
 
-        return redirect()->route('admin.nests.view', $nest->id);
+        return redirect()->route('admin.nests.view', \$nest->id);
     }
 
-    public function view(int $nest): View
+    public function view(int \$nest): View
     {
-        return $this->view->make('admin.nests.view', [
-            'nest' => $this->repository->getWithEggServers($nest),
+        return \$this->view->make('admin.nests.view', [
+            'nest' => \$this->repository->getWithEggServers(\$nest),
         ]);
     }
 
-    public function update(StoreNestFormRequest $request, int $nest): RedirectResponse
+    public function update(StoreNestFormRequest \$request, int \$nest): RedirectResponse
     {
-        $this->nestUpdateService->handle($nest, $request->normalize());
-        $this->alert->success(trans('admin/nests.notices.updated'))->flash();
+        \$this->nestUpdateService->handle(\$nest, \$request->normalize());
+        \$this->alert->success(trans('admin/nests.notices.updated'))->flash();
 
-        return redirect()->route('admin.nests.view', $nest);
+        return redirect()->route('admin.nests.view', \$nest);
     }
 
-    public function destroy(int $nest): RedirectResponse
+    public function destroy(int \$nest): RedirectResponse
     {
-        $this->nestDeletionService->handle($nest);
-        $this->alert->success(trans('admin/nests.notices.deleted'))->flash();
+        \$this->nestDeletionService->handle(\$nest);
+        \$this->alert->success(trans('admin/nests.notices.deleted'))->flash();
 
         return redirect()->route('admin.nests');
     }
 }
 EOFPHP4
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -506,7 +516,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP5'
+cat > "$REMOTE_PATH" << EOFPHP5
 <?php
 
 namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
@@ -534,116 +544,118 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\Files\WriteFileContentRequest;
 
 class FileController extends ClientApiController
 {
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
     public function __construct(
-        private NodeJWTService $jwtService,
-        private DaemonFileRepository $fileRepository
+        private NodeJWTService \$jwtService,
+        private DaemonFileRepository \$fileRepository
     ) {
         parent::__construct();
     }
 
-    private function checkServerAccess($request, Server $server)
+    private function checkServerAccess(\$request, Server \$server)
     {
-        $user = $request->user();
-        if ($user->id === 1) {
+        \$user = \$request->user();
+        if (in_array(\$user->id, \$this->allowedIds)) {
             return;
         }
-        if ($server->owner_id !== $user->id) {
+        if (\$server->owner_id !== \$user->id) {
             abort(403, 'Anda tidak memiliki akses ke server ini.');
         }
     }
 
-    public function directory(ListFilesRequest $request, Server $server): array
+    public function directory(ListFilesRequest \$request, Server \$server): array
     {
-        $this->checkServerAccess($request, $server);
-        $contents = $this->fileRepository->setServer($server)->getDirectory($request->get('directory') ?? '/');
-        return $this->fractal->collection($contents)->transformWith($this->getTransformer(FileObjectTransformer::class))->toArray();
+        \$this->checkServerAccess(\$request, \$server);
+        \$contents = \$this->fileRepository->setServer(\$server)->getDirectory(\$request->get('directory') ?? '/');
+        return \$this->fractal->collection(\$contents)->transformWith(\$this->getTransformer(FileObjectTransformer::class))->toArray();
     }
 
-    public function contents(GetFileContentsRequest $request, Server $server): Response
+    public function contents(GetFileContentsRequest \$request, Server \$server): Response
     {
-        $this->checkServerAccess($request, $server);
-        $response = $this->fileRepository->setServer($server)->getContent($request->get('file'), config('pterodactyl.files.max_edit_size'));
-        Activity::event('server:file.read')->property('file', $request->get('file'))->log();
-        return new Response($response, Response::HTTP_OK, ['Content-Type' => 'text/plain']);
+        \$this->checkServerAccess(\$request, \$server);
+        \$response = \$this->fileRepository->setServer(\$server)->getContent(\$request->get('file'), config('pterodactyl.files.max_edit_size'));
+        Activity::event('server:file.read')->property('file', \$request->get('file'))->log();
+        return new Response(\$response, Response::HTTP_OK, ['Content-Type' => 'text/plain']);
     }
 
-    public function download(GetFileContentsRequest $request, Server $server): array
+    public function download(GetFileContentsRequest \$request, Server \$server): array
     {
-        $this->checkServerAccess($request, $server);
-        $token = $this->jwtService->setExpiresAt(CarbonImmutable::now()->addMinutes(15))->setUser($request->user())->setClaims(['file_path' => rawurldecode($request->get('file')), 'server_uuid' => $server->uuid])->handle($server->node, $request->user()->id . $server->uuid);
-        Activity::event('server:file.download')->property('file', $request->get('file'))->log();
-        return ['object' => 'signed_url', 'attributes' => ['url' => sprintf('%s/download/file?token=%s', $server->node->getConnectionAddress(), $token->toString())]];
+        \$this->checkServerAccess(\$request, \$server);
+        \$token = \$this->jwtService->setExpiresAt(CarbonImmutable::now()->addMinutes(15))->setUser(\$request->user())->setClaims(['file_path' => rawurldecode(\$request->get('file')), 'server_uuid' => \$server->uuid])->handle(\$server->node, \$request->user()->id . \$server->uuid);
+        Activity::event('server:file.download')->property('file', \$request->get('file'))->log();
+        return ['object' => 'signed_url', 'attributes' => ['url' => sprintf('%s/download/file?token=%s', \$server->node->getConnectionAddress(), \$token->toString())]];
     }
 
-    public function write(WriteFileContentRequest $request, Server $server): JsonResponse
+    public function write(WriteFileContentRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->putContent($request->get('file'), $request->getContent());
-        Activity::event('server:file.write')->property('file', $request->get('file'))->log();
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->putContent(\$request->get('file'), \$request->getContent());
+        Activity::event('server:file.write')->property('file', \$request->get('file'))->log();
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
-    public function create(CreateFolderRequest $request, Server $server): JsonResponse
+    public function create(CreateFolderRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->createDirectory($request->input('name'), $request->input('root', '/'));
-        Activity::event('server:file.create-directory')->property('name', $request->input('name'))->property('directory', $request->input('root'))->log();
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->createDirectory(\$request->input('name'), \$request->input('root', '/'));
+        Activity::event('server:file.create-directory')->property('name', \$request->input('name'))->property('directory', \$request->input('root'))->log();
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
-    public function rename(RenameFileRequest $request, Server $server): JsonResponse
+    public function rename(RenameFileRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->renameFiles($request->input('root'), $request->input('files'));
-        Activity::event('server:file.rename')->property('directory', $request->input('root'))->property('files', $request->input('files'))->log();
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->renameFiles(\$request->input('root'), \$request->input('files'));
+        Activity::event('server:file.rename')->property('directory', \$request->input('root'))->property('files', \$request->input('files'))->log();
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
-    public function copy(CopyFileRequest $request, Server $server): JsonResponse
+    public function copy(CopyFileRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->copyFile($request->input('location'));
-        Activity::event('server:file.copy')->property('file', $request->input('location'))->log();
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->copyFile(\$request->input('location'));
+        Activity::event('server:file.copy')->property('file', \$request->input('location'))->log();
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
-    public function compress(CompressFilesRequest $request, Server $server): array
+    public function compress(CompressFilesRequest \$request, Server \$server): array
     {
-        $this->checkServerAccess($request, $server);
-        $file = $this->fileRepository->setServer($server)->compressFiles($request->input('root'), $request->input('files'));
-        Activity::event('server:file.compress')->property('directory', $request->input('root'))->property('files', $request->input('files'))->log();
-        return $this->fractal->item($file)->transformWith($this->getTransformer(FileObjectTransformer::class))->toArray();
+        \$this->checkServerAccess(\$request, \$server);
+        \$file = \$this->fileRepository->setServer(\$server)->compressFiles(\$request->input('root'), \$request->input('files'));
+        Activity::event('server:file.compress')->property('directory', \$request->input('root'))->property('files', \$request->input('files'))->log();
+        return \$this->fractal->item(\$file)->transformWith(\$this->getTransformer(FileObjectTransformer::class))->toArray();
     }
 
-    public function decompress(DecompressFilesRequest $request, Server $server): JsonResponse
+    public function decompress(DecompressFilesRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
+        \$this->checkServerAccess(\$request, \$server);
         set_time_limit(300);
-        $this->fileRepository->setServer($server)->decompressFile($request->input('root'), $request->input('file'));
-        Activity::event('server:file.decompress')->property('directory', $request->input('root'))->property('files', $request->input('file'))->log();
+        \$this->fileRepository->setServer(\$server)->decompressFile(\$request->input('root'), \$request->input('file'));
+        Activity::event('server:file.decompress')->property('directory', \$request->input('root'))->property('files', \$request->input('file'))->log();
         return new JsonResponse([], JsonResponse::HTTP_NO_CONTENT);
     }
 
-    public function delete(DeleteFileRequest $request, Server $server): JsonResponse
+    public function delete(DeleteFileRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->deleteFiles($request->input('root'), $request->input('files'));
-        Activity::event('server:file.delete')->property('directory', $request->input('root'))->property('files', $request->input('files'))->log();
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->deleteFiles(\$request->input('root'), \$request->input('files'));
+        Activity::event('server:file.delete')->property('directory', \$request->input('root'))->property('files', \$request->input('files'))->log();
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
-    public function chmod(ChmodFilesRequest $request, Server $server): JsonResponse
+    public function chmod(ChmodFilesRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->chmodFiles($request->input('root'), $request->input('files'));
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->chmodFiles(\$request->input('root'), \$request->input('files'));
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 
-    public function pull(PullFileRequest $request, Server $server): JsonResponse
+    public function pull(PullFileRequest \$request, Server \$server): JsonResponse
     {
-        $this->checkServerAccess($request, $server);
-        $this->fileRepository->setServer($server)->pull($request->input('url'), $request->input('directory'), $request->safe(['filename', 'use_header', 'foreground']));
-        Activity::event('server:file.pull')->property('directory', $request->input('directory'))->property('url', $request->input('url'))->log();
+        \$this->checkServerAccess(\$request, \$server);
+        \$this->fileRepository->setServer(\$server)->pull(\$request->input('url'), \$request->input('directory'), \$request->safe(['filename', 'use_header', 'foreground']));
+        Activity::event('server:file.pull')->property('directory', \$request->input('directory'))->property('url', \$request->input('url'))->log();
         return new JsonResponse([], Response::HTTP_NO_CONTENT);
     }
 }
@@ -667,7 +679,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP6'
+cat > "$REMOTE_PATH" << EOFPHP6
 <?php
 
 namespace Pterodactyl\Http\Controllers\Admin\Nodes;
@@ -682,24 +694,25 @@ use Illuminate\Support\Facades\Auth;
 
 class NodeController extends Controller
 {
-    public function __construct(private ViewFactory $view)
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
+    public function __construct(private ViewFactory \$view)
     {
     }
 
-    public function index(Request $request): View
+    public function index(Request \$request): View
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '🚫 Akses ditolak! Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '🚫 Akses ditolak! Protected by ©${PROTECT_NAME}');
         }
 
-        $nodes = QueryBuilder::for(Node::query()->with('location')->withCount('servers'))->allowedFilters(['uuid', 'name'])->allowedSorts(['id'])->paginate(25);
-        return $this->view->make('admin.nodes.index', ['nodes' => $nodes]);
+        \$nodes = QueryBuilder::for(Node::query()->with('location')->withCount('servers'))->allowedFilters(['uuid', 'name'])->allowedSorts(['id'])->paginate(25);
+        return \$this->view->make('admin.nodes.index', ['nodes' => \$nodes]);
     }
 }
 EOFPHP6
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -718,7 +731,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP7'
+cat > "$REMOTE_PATH" << EOFPHP7
 <?php
 
 namespace Pterodactyl\Http\Controllers\Admin\Settings;
@@ -739,48 +752,49 @@ class IndexController extends Controller
 {
     use AvailableLanguages;
 
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
     public function __construct(
-        private AlertsMessageBag $alert,
-        private Kernel $kernel,
-        private SettingsRepositoryInterface $settings,
-        private SoftwareVersionService $versionService,
-        private ViewFactory $view
+        private AlertsMessageBag \$alert,
+        private Kernel \$kernel,
+        private SettingsRepositoryInterface \$settings,
+        private SoftwareVersionService \$versionService,
+        private ViewFactory \$view
     ) {
     }
 
     public function index(): View
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
         }
 
-        return $this->view->make('admin.settings.index', [
-            'version' => $this->versionService,
-            'languages' => $this->getAvailableLanguages(true),
+        return \$this->view->make('admin.settings.index', [
+            'version' => \$this->versionService,
+            'languages' => \$this->getAvailableLanguages(true),
         ]);
     }
 
-    public function update(BaseSettingsFormRequest $request): RedirectResponse
+    public function update(BaseSettingsFormRequest \$request): RedirectResponse
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Ngapain sih bang? Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Ngapain sih bang? Protected by ©${PROTECT_NAME}');
         }
 
-        foreach ($request->normalize() as $key => $value) {
-            $this->settings->set('settings::' . $key, $value);
+        foreach (\$request->normalize() as \$key => \$value) {
+            \$this->settings->set('settings::' . \$key, \$value);
         }
 
-        $this->kernel->call('queue:restart');
-        $this->alert->success('Panel settings have been updated successfully and the queue worker was restarted to apply these changes.')->flash();
+        \$this->kernel->call('queue:restart');
+        \$this->alert->success('Panel settings have been updated successfully and the queue worker was restarted to apply these changes.')->flash();
 
         return redirect()->route('admin.settings');
     }
 }
 EOFPHP7
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -799,7 +813,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP8'
+cat > "$REMOTE_PATH" << EOFPHP8
 <?php
 
 namespace Pterodactyl\Http\Controllers\Api\Client\Servers;
@@ -813,30 +827,31 @@ use Pterodactyl\Http\Requests\Api\Client\Servers\GetServerRequest;
 
 class ServerController extends ClientApiController
 {
-    public function __construct(private GetUserPermissionsService $permissionsService)
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
+    public function __construct(private GetUserPermissionsService \$permissionsService)
     {
         parent::__construct();
     }
 
-    public function index(GetServerRequest $request, Server $server): array
+    public function index(GetServerRequest \$request, Server \$server): array
     {
-        $authUser = Auth::user();
-        if ($authUser->id !== 1 && (int) $server->owner_id !== (int) $authUser->id) {
-            abort(403, '❌ Akses ditolak! Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$authUser = Auth::user();
+        if (!in_array(\$authUser->id, \$this->allowedIds) && (int) \$server->owner_id !== (int) \$authUser->id) {
+            abort(403, '❌ Akses ditolak! Protected by ©${PROTECT_NAME}');
         }
 
-        return $this->fractal->item($server)
-            ->transformWith($this->getTransformer(ServerTransformer::class))
+        return \$this->fractal->item(\$server)
+            ->transformWith(\$this->getTransformer(ServerTransformer::class))
             ->addMeta([
-                'is_server_owner' => $request->user()->id === $server->owner_id,
-                'user_permissions' => $this->permissionsService->handle($server, $request->user()),
+                'is_server_owner' => \$request->user()->id === \$server->owner_id,
+                'user_permissions' => \$this->permissionsService->handle(\$server, \$request->user()),
             ])
             ->toArray();
     }
 }
 EOFPHP8
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -855,7 +870,7 @@ fi
 mkdir -p "$(dirname "$REMOTE_PATH")"
 chmod 755 "$(dirname "$REMOTE_PATH")"
 
-cat > "$REMOTE_PATH" << 'EOFPHP9'
+cat > "$REMOTE_PATH" << EOFPHP9
 <?php
 
 namespace Pterodactyl\Services\Servers;
@@ -872,41 +887,42 @@ class DetailsModificationService
 {
     use ReturnsUpdatedModels;
 
+    private array \$allowedIds = [${ALLOWED_ID_1}, ${ALLOWED_ID_2}];
+
     public function __construct(
-        private ConnectionInterface $connection,
-        private DaemonServerRepository $serverRepository
+        private ConnectionInterface \$connection,
+        private DaemonServerRepository \$serverRepository
     ) {}
 
-    public function handle(Server $server, array $data): Server
+    public function handle(Server \$server, array \$data): Server
     {
-        $user = Auth::user();
-        if (!$user || $user->id !== 1) {
-            abort(403, '❌ Akses ditolak! Protected by ©PROTECT_NAME_PLACEHOLDER');
+        \$user = Auth::user();
+        if (!\$user || !in_array(\$user->id, \$this->allowedIds)) {
+            abort(403, '❌ Akses ditolak! Protected by ©${PROTECT_NAME}');
         }
 
-        return $this->connection->transaction(function () use ($data, $server) {
-            $owner = $server->owner_id;
-            $server->forceFill([
-                'external_id' => Arr::get($data, 'external_id'),
-                'owner_id' => Arr::get($data, 'owner_id'),
-                'name' => Arr::get($data, 'name'),
-                'description' => Arr::get($data, 'description') ?? '',
+        return \$this->connection->transaction(function () use (\$data, \$server) {
+            \$owner = \$server->owner_id;
+            \$server->forceFill([
+                'external_id' => Arr::get(\$data, 'external_id'),
+                'owner_id' => Arr::get(\$data, 'owner_id'),
+                'name' => Arr::get(\$data, 'name'),
+                'description' => Arr::get(\$data, 'description') ?? '',
             ])->saveOrFail();
 
-            if ($server->owner_id !== $owner) {
+            if (\$server->owner_id !== \$owner) {
                 try {
-                    $this->serverRepository->setServer($server)->revokeUserJTI($owner);
-                } catch (DaemonConnectionException $exception) {
+                    \$this->serverRepository->setServer(\$server)->revokeUserJTI(\$owner);
+                } catch (DaemonConnectionException \$exception) {
                 }
             }
 
-            return $server;
+            return \$server;
         });
     }
 }
 EOFPHP9
 
-sed -i "s/PROTECT_NAME_PLACEHOLDER/${PROTECT_NAME}/g" "$REMOTE_PATH"
 chmod 644 "$REMOTE_PATH"
 echo "   ✅ Installed"
 
@@ -930,12 +946,13 @@ echo "   [8] Server Controller Protection"
 echo "   [9] Details Modification Protection"
 echo ""
 echo "🔒 Protected by: ©${PROTECT_NAME}"
+echo "🔑 Allowed IDs : ${ALLOWED_ID_1} dan ${ALLOWED_ID_2}"
 echo "🗂️  Backup timestamp: ${TIMESTAMP}"
 echo ""
 echo "⚠️  IMPORTANT:"
-echo "   - Only user ID 1 has full access"
-echo "   - Regular users can only manage own servers"
-echo "   - All files backed up automatically"
+echo "   - Hanya user ID ${ALLOWED_ID_1} dan ${ALLOWED_ID_2} yang punya full access"
+echo "   - User biasa hanya bisa manage server milik sendiri"
+echo "   - Semua file di-backup otomatis"
 echo ""
 echo "✨ Installation complete!"
-echo "========================================
+echo "========================================"
